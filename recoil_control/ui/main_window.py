@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -39,12 +40,14 @@ from ..input_backend import InputListener, IS_WINDOWS
 from ..model import (
     ACTIVATION_LABELS,
     ACTIVATION_MODES,
+    WEAPON_TEMPLATES,
     AppConfig,
     Profile,
     Step,
     config_path,
     load_config,
     save_config,
+    template_profile,
 )
 from . import style
 from .pattern_canvas import PatternCanvas
@@ -218,6 +221,10 @@ class MainWindow(QMainWindow):
         row.addWidget(rem)
         v.addLayout(row)
 
+        self.template_btn = QPushButton("New from template…")
+        self.template_btn.setMenu(self._build_template_menu())
+        v.addWidget(self.template_btn)
+
         row2 = QHBoxLayout()
         imp = QPushButton("Import…")
         imp.clicked.connect(self._import_profile)
@@ -310,20 +317,30 @@ class MainWindow(QMainWindow):
         self.weapon_edit.textEdited.connect(self._on_field_changed)
         grid.addWidget(self.weapon_edit, 1, 1)
 
-        grid.addWidget(QLabel("Activation"), 2, 0)
+        grid.addWidget(QLabel("Group"), 2, 0)
+        self.category_combo = QComboBox()
+        self.category_combo.setEditable(True)
+        self.category_combo.addItems(["", *WEAPON_TEMPLATES.keys()])
+        self.category_combo.setToolTip(
+            "Virtual subgroup this profile belongs to (e.g. CS or Rust)."
+        )
+        self.category_combo.currentTextChanged.connect(self._on_category_changed)
+        grid.addWidget(self.category_combo, 2, 1)
+
+        grid.addWidget(QLabel("Activation"), 3, 0)
         self.activation = QComboBox()
         for mode in ACTIVATION_MODES:
             self.activation.addItem(ACTIVATION_LABELS[mode], mode)
         self.activation.currentIndexChanged.connect(self._on_field_changed)
-        grid.addWidget(self.activation, 2, 1)
+        grid.addWidget(self.activation, 3, 1)
 
-        grid.addWidget(QLabel("Sensitivity"), 3, 0)
+        grid.addWidget(QLabel("Sensitivity"), 4, 0)
         self.prof_sens = QDoubleSpinBox()
         self.prof_sens.setRange(0.05, 10.0)
         self.prof_sens.setSingleStep(0.05)
         self.prof_sens.setDecimals(2)
         self.prof_sens.valueChanged.connect(self._on_field_changed)
-        grid.addWidget(self.prof_sens, 3, 1)
+        grid.addWidget(self.prof_sens, 4, 1)
         v.addLayout(grid)
 
         self.loop_chk = QCheckBox("Loop pattern while held")
@@ -363,14 +380,43 @@ class MainWindow(QMainWindow):
             self.subtitle.setText(f"Save failed: {exc}")
 
     # ----------------------------------------------------------- list logic
+    def _profile_label(self, p: Profile) -> str:
+        return p.name if not p.weapon else f"{p.name}  ·  {p.weapon}"
+
+    def _list_row_for_active(self) -> int:
+        for row, pidx in enumerate(self._row_to_profile):
+            if pidx == self.cfg.active_index:
+                return row
+        return -1
+
     def _refresh_profile_list(self) -> None:
         self._loading = True
         self.profile_list.clear()
-        for p in self.cfg.profiles:
-            label = p.name if not p.weapon else f"{p.name}  ·  {p.weapon}"
-            self.profile_list.addItem(QListWidgetItem(label))
-        if 0 <= self.cfg.active_index < self.profile_list.count():
-            self.profile_list.setCurrentRow(self.cfg.active_index)
+        # Map each visible list row back to a profile index (-1 = header row).
+        self._row_to_profile: list[int] = []
+
+        groups: dict[str, list[int]] = {}
+        order: list[str] = []
+        for i, p in enumerate(self.cfg.profiles):
+            cat = p.category.strip() or "Ungrouped"
+            if cat not in groups:
+                groups[cat] = []
+                order.append(cat)
+            groups[cat].append(i)
+
+        for cat in order:
+            header = QListWidgetItem(cat.upper())
+            header.setFlags(Qt.NoItemFlags)
+            self.profile_list.addItem(header)
+            self._row_to_profile.append(-1)
+            for i in groups[cat]:
+                item = QListWidgetItem("    " + self._profile_label(self.cfg.profiles[i]))
+                self.profile_list.addItem(item)
+                self._row_to_profile.append(i)
+
+        row = self._list_row_for_active()
+        if row >= 0:
+            self.profile_list.setCurrentRow(row)
         self._loading = False
 
     def _load_active_into_ui(self) -> None:
@@ -386,6 +432,7 @@ class MainWindow(QMainWindow):
             return
         self.name_edit.setText(profile.name)
         self.weapon_edit.setText(profile.weapon)
+        self.category_combo.setCurrentText(profile.category)
         idx = self.activation.findData(profile.activation)
         self.activation.setCurrentIndex(max(0, idx))
         self.prof_sens.setValue(profile.sensitivity)
@@ -411,9 +458,12 @@ class MainWindow(QMainWindow):
 
     # --------------------------------------------------------------- events
     def _on_profile_selected(self, row: int) -> None:
-        if self._loading or row < 0:
+        if self._loading or row < 0 or row >= len(self._row_to_profile):
             return
-        self.cfg.active_index = row
+        pidx = self._row_to_profile[row]
+        if pidx < 0:  # header row
+            return
+        self.cfg.active_index = pidx
         self.engine.set_active_profile(self.cfg.active_profile())
         self._load_active_into_ui()
         self._schedule_save()
@@ -462,10 +512,15 @@ class MainWindow(QMainWindow):
         if profile is None:
             return
         profile.name = text
-        item = self.profile_list.item(self.cfg.active_index)
-        if item is not None:
-            item.setText(text if not profile.weapon else f"{text}  ·  {profile.weapon}")
+        self._update_active_list_label()
         self._schedule_save()
+
+    def _update_active_list_label(self) -> None:
+        profile = self._current_profile()
+        row = self._list_row_for_active()
+        item = self.profile_list.item(row) if row >= 0 else None
+        if profile is not None and item is not None:
+            item.setText("    " + self._profile_label(profile))
 
     def _on_field_changed(self, *args) -> None:
         if self._loading:
@@ -478,11 +533,51 @@ class MainWindow(QMainWindow):
         profile.sensitivity = self.prof_sens.value()
         profile.loop = self.loop_chk.isChecked()
         profile.repeat_last = self.repeat_chk.isChecked()
-        item = self.profile_list.item(self.cfg.active_index)
-        if item is not None:
-            item.setText(
-                profile.name if not profile.weapon else f"{profile.name}  ·  {profile.weapon}"
+        self._update_active_list_label()
+        self._schedule_save()
+
+    def _on_category_changed(self, text: str) -> None:
+        if self._loading:
+            return
+        profile = self._current_profile()
+        if profile is None:
+            return
+        profile.category = text.strip()
+        self._refresh_profile_list()
+        self._schedule_save()
+
+    # -------------------------------------------------------- templates
+    def _build_template_menu(self) -> QMenu:
+        menu = QMenu(self)
+        for category, weapons in WEAPON_TEMPLATES.items():
+            sub = menu.addMenu(category)
+            all_act = sub.addAction(f"Add all {category} slots")
+            all_act.triggered.connect(
+                lambda _checked=False, c=category: self._add_template_group(c)
             )
+            sub.addSeparator()
+            for weapon in weapons:
+                act = sub.addAction(weapon)
+                act.triggered.connect(
+                    lambda _checked=False, c=category, w=weapon: self._add_template_slot(c, w)
+                )
+        return menu
+
+    def _add_template_slot(self, category: str, weapon: str) -> None:
+        self.cfg.profiles.append(template_profile(category, weapon))
+        self.cfg.active_index = len(self.cfg.profiles) - 1
+        self.engine.set_active_profile(self.cfg.active_profile())
+        self._refresh_profile_list()
+        self._load_active_into_ui()
+        self._schedule_save()
+
+    def _add_template_group(self, category: str) -> None:
+        for weapon in WEAPON_TEMPLATES.get(category, []):
+            self.cfg.profiles.append(template_profile(category, weapon))
+        self.cfg.active_index = len(self.cfg.profiles) - 1
+        self.engine.set_active_profile(self.cfg.active_profile())
+        self._refresh_profile_list()
+        self._load_active_into_ui()
         self._schedule_save()
 
     def _on_note_changed(self) -> None:

@@ -56,6 +56,7 @@ class Profile:
 
     name: str = "New profile"
     weapon: str = ""
+    category: str = ""
     steps: list[Step] = field(default_factory=list)
     sensitivity: float = 1.0
     activation: str = ACTIVATION_LMB
@@ -67,6 +68,7 @@ class Profile:
         return {
             "name": self.name,
             "weapon": self.weapon,
+            "category": self.category,
             "steps": [s.to_dict() for s in self.steps],
             "sensitivity": self.sensitivity,
             "activation": self.activation,
@@ -83,6 +85,7 @@ class Profile:
         return cls(
             name=str(data.get("name", "New profile")),
             weapon=str(data.get("weapon", "")),
+            category=str(data.get("category", "")),
             steps=[Step.from_dict(s) for s in data.get("steps", [])],
             sensitivity=float(data.get("sensitivity", 1.0)),
             activation=activation,
@@ -128,6 +131,42 @@ class AppConfig:
             global_sensitivity=float(data.get("global_sensitivity", 1.0)),
             tick_ms=int(data.get("tick_ms", 8)),
         )
+
+
+# Empty weapon-name slots, grouped by the festival's virtual subgroups.
+# These are ORGANISATIONAL templates only: names + an empty pattern. No real
+# in-game recoil values or fire-rate timings are shipped — each competitor
+# fills in their own numbers.
+WEAPON_TEMPLATES: dict[str, list[str]] = {
+    "CS": ["AK-47"],
+    "Rust": [
+        "Assault Rifle",
+        "LR-300",
+        "Custom SMG",
+        "Thompson",
+        "MP5A4",
+        "Semi-Automatic Rifle",
+        "M39 Rifle",
+        "M249",
+        "Semi-Automatic Pistol",
+        "Python Revolver",
+        "Revolver",
+        "M92 Pistol",
+        "Nailgun",
+    ],
+}
+
+
+def template_profile(category: str, weapon: str) -> Profile:
+    """An empty, named slot for a weapon (no recoil values, no timings)."""
+
+    return Profile(
+        name=weapon,
+        weapon=weapon,
+        category=category,
+        steps=[],
+        note="Empty slot — add your own pattern points and per-step delays.",
+    )
 
 
 def base_dir() -> Path:

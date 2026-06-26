@@ -14,6 +14,11 @@ that runs from a flash drive.
 
 - **Weapon profiles** — unlimited named profiles, each with its own
   pattern and behaviour. Switch instantly from the sidebar.
+- **Groups & weapon-name templates** — organize profiles into virtual
+  subgroups (e.g. `CS`, `Rust`) and seed them from empty, pre-named weapon
+  slots via *New from template…*. Templates are **organizational only**:
+  they carry weapon names and an empty pattern — no game-specific recoil
+  values or timings are shipped, every competitor fills in their own.
 - **Visual pattern editor** — click to add recoil points, drag to fine
   tune, right-click to delete; the cumulative aim path is drawn live on a
   grid with zoom.
