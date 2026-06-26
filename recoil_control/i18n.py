@@ -102,6 +102,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_failed": "Save failed",
         "save_failed": "Save failed: {error}",
         "input_unavailable": "Input listener unavailable: {error}",
+        "not_admin_title": "Run as administrator",
+        "not_admin_body": "This app is not running as administrator.\n\nMost games run elevated, and Windows blocks injected mouse input from a non-elevated program \u2014 so recoil compensation will do nothing in-game.\n\nClose the app and relaunch it via right-click \u2192 \"Run as administrator\".",
     },
     "ru": {
         "tab_main": "Главная",
@@ -180,6 +182,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_failed": "Ошибка сохранения",
         "save_failed": "Не удалось сохранить: {error}",
         "input_unavailable": "Слушатель ввода недоступен: {error}",
+        "not_admin_title": "Запустите от имени администратора",
+        "not_admin_body": "Приложение запущено не от имени администратора.\n\nБольшинство игр работают с правами администратора, и Windows блокирует ввод мыши от программы без таких прав \u2014 поэтому компенсация отдачи не будет работать в игре.\n\nЗакройте приложение и запустите его через правый клик \u2192 \"Запуск от имени администратора\".",
     },
 }
 

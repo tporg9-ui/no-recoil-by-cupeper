@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
 from .. import __app_name__, __version__
 from ..engine import RecoilEngine
 from ..i18n import LANGUAGES, TR, t
-from ..input_backend import InputListener, IS_WINDOWS
+from ..input_backend import InputListener, IS_WINDOWS, is_elevated
 from ..model import (
     ACTIVATION_LMB,
     ACTIVATION_LMB_AND_RMB,
@@ -1192,6 +1192,8 @@ def run() -> int:
     app.setStyleSheet(style.build_stylesheet())
     window = MainWindow()
     window.show()
+    if IS_WINDOWS and not is_elevated():
+        QMessageBox.warning(window, t("not_admin_title"), t("not_admin_body"))
     # Convenience: Esc disarms instantly.
     panic = QShortcut(QKeySequence(Qt.Key_Escape), window)
     panic.activated.connect(lambda: window.master_btn.setChecked(False))

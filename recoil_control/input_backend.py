@@ -15,6 +15,23 @@ from typing import Callable
 IS_WINDOWS = sys.platform.startswith("win")
 
 
+def is_elevated() -> bool:
+    """True if the process has administrator rights (always True off Windows).
+
+    Games typically run elevated; Windows blocks injected mouse input from a
+    lower-integrity process (UIPI), so movement silently does nothing in-game
+    unless this app is also run as administrator.
+    """
+    if not IS_WINDOWS:
+        return True
+    try:
+        import ctypes
+
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
 class MouseMover:
     """Applies relative mouse movement in integer mouse counts."""
 

@@ -62,6 +62,19 @@ python build.py
 The single-file `dist/RecoilControlStudio.exe` is what you copy to the
 flash drive. It needs no installation; profiles travel alongside it.
 
+### Run it as administrator
+
+Most games run elevated, and Windows (UIPI) silently blocks injected
+mouse input coming from a lower-integrity process. If the macro "works on
+the desktop but does nothing in-game once the cursor disappears", that's
+why. The build is marked to request elevation (`--uac-admin`), so the
+`.exe` will prompt for administrator rights on launch — accept it. When
+running from source, start your terminal as administrator first.
+
+Note: a few games read the mouse via Raw Input with legacy input disabled
+and ignore *any* injected movement (`SendInput`). Those require a
+driver/hardware-level solution and are out of scope here.
+
 ## How it works
 
 A background thread watches the configured fire condition (mouse buttons).

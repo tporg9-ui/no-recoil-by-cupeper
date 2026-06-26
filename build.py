@@ -23,6 +23,10 @@ def main() -> None:
             "--clean",
             "--onefile",
             "--windowed",
+            # Request elevation: games usually run as administrator, and
+            # Windows (UIPI) blocks injected input from a lower-integrity
+            # process, so without this the mouse won't move in-game.
+            "--uac-admin",
             f"--name={APP_NAME}",
         ]
     )
