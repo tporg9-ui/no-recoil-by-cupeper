@@ -1,6 +1,13 @@
-"""Dark theme stylesheet and shared colors."""
+"""Theme stylesheet and shared colors.
 
-# Palette
+Colors are module-level so the canvas can read the current palette at paint
+time. Call :func:`apply_theme` to switch theme/accent at runtime, then
+re-apply the returned stylesheet on the QApplication and repaint widgets.
+"""
+
+from __future__ import annotations
+
+# Active palette (mutated by apply_theme). Defaults to the dark theme.
 BG = "#0f1115"
 BG_PANEL = "#171a21"
 BG_ELEV = "#1e222b"
@@ -9,18 +16,94 @@ TEXT = "#e6e9ef"
 TEXT_DIM = "#8b93a7"
 ACCENT = "#27d796"
 ACCENT_DIM = "#1f9e72"
+ON_ACCENT = "#06281d"
 DANGER = "#ff5c5c"
 WARN = "#ffb454"
 
 GRID = "#222734"
 GRID_AXIS = "#384055"
-PATH = "#27d796"
+PATH = ACCENT
 POINT = "#5cc8ff"
 POINT_SEL = "#ffb454"
 MARKER = "#ff5c5c"
 
+_THEMES = {
+    "dark": {
+        "BG": "#0f1115",
+        "BG_PANEL": "#171a21",
+        "BG_ELEV": "#1e222b",
+        "BORDER": "#2a2f3a",
+        "TEXT": "#e6e9ef",
+        "TEXT_DIM": "#8b93a7",
+        "GRID": "#222734",
+        "GRID_AXIS": "#384055",
+        "POINT": "#5cc8ff",
+        "POINT_SEL": "#ffb454",
+        "MARKER": "#ff5c5c",
+    },
+    "light": {
+        "BG": "#f3f5f9",
+        "BG_PANEL": "#ffffff",
+        "BG_ELEV": "#e9edf4",
+        "BORDER": "#cdd4e0",
+        "TEXT": "#1b2030",
+        "TEXT_DIM": "#5d6680",
+        "GRID": "#dfe4ee",
+        "GRID_AXIS": "#b4bdd0",
+        "POINT": "#2a7fd0",
+        "POINT_SEL": "#d98a17",
+        "MARKER": "#e23b3b",
+    },
+}
 
-STYLESHEET = f"""
+
+def _darken(hex_color: str, factor: float = 0.78) -> str:
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return hex_color
+    r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+    r, g, b = (max(0, min(255, int(c * factor))) for c in (r, g, b))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _readable_on(hex_color: str) -> str:
+    """Black or near-black/white text that reads on the accent color."""
+    h = hex_color.lstrip("#")
+    if len(h) != 6:
+        return "#06281d"
+    r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#0c0f14" if luminance > 0.6 else "#ffffff"
+
+
+def apply_theme(accent: str, theme: str = "dark") -> str:
+    """Update the active palette and return the matching stylesheet."""
+    global BG, BG_PANEL, BG_ELEV, BORDER, TEXT, TEXT_DIM
+    global ACCENT, ACCENT_DIM, ON_ACCENT, PATH
+    global GRID, GRID_AXIS, POINT, POINT_SEL, MARKER
+
+    pal = _THEMES.get(theme, _THEMES["dark"])
+    BG = pal["BG"]
+    BG_PANEL = pal["BG_PANEL"]
+    BG_ELEV = pal["BG_ELEV"]
+    BORDER = pal["BORDER"]
+    TEXT = pal["TEXT"]
+    TEXT_DIM = pal["TEXT_DIM"]
+    GRID = pal["GRID"]
+    GRID_AXIS = pal["GRID_AXIS"]
+    POINT = pal["POINT"]
+    POINT_SEL = pal["POINT_SEL"]
+    MARKER = pal["MARKER"]
+
+    ACCENT = accent or "#27d796"
+    ACCENT_DIM = _darken(ACCENT)
+    ON_ACCENT = _readable_on(ACCENT)
+    PATH = ACCENT
+    return build_stylesheet()
+
+
+def build_stylesheet() -> str:
+    return f"""
 * {{
     font-family: "Segoe UI", "Noto Sans", "DejaVu Sans", sans-serif;
     font-size: 13px;
@@ -53,6 +136,25 @@ QLabel.sectionTitle, QLabel#sectionTitle {{
     font-weight: 700;
     text-transform: uppercase;
 }}
+QTabWidget::pane {{
+    border: 1px solid {BORDER};
+    border-radius: 10px;
+    top: -1px;
+}}
+QTabBar::tab {{
+    background: {BG_ELEV};
+    color: {TEXT_DIM};
+    border: 1px solid {BORDER};
+    padding: 7px 16px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    margin-right: 2px;
+}}
+QTabBar::tab:selected {{
+    background: {BG_PANEL};
+    color: {TEXT};
+    border-bottom-color: {BG_PANEL};
+}}
 QPushButton {{
     background: {BG_ELEV};
     border: 1px solid {BORDER};
@@ -63,10 +165,11 @@ QPushButton {{
 QPushButton:hover {{ border-color: {ACCENT_DIM}; }}
 QPushButton:pressed {{ background: {BORDER}; }}
 QPushButton:disabled {{ color: {TEXT_DIM}; border-color: {BORDER}; }}
+QPushButton::menu-indicator {{ subcontrol-position: right center; right: 6px; }}
 QPushButton#primary {{
     background: {ACCENT_DIM};
     border: 1px solid {ACCENT};
-    color: #06281d;
+    color: {ON_ACCENT};
     font-weight: 700;
 }}
 QPushButton#primary:hover {{ background: {ACCENT}; }}
@@ -84,7 +187,7 @@ QPushButton#master {{
 QPushButton#master:checked {{
     background: {ACCENT_DIM};
     border: 1px solid {ACCENT};
-    color: #06281d;
+    color: {ON_ACCENT};
 }}
 
 QLineEdit, QDoubleSpinBox, QSpinBox, QComboBox, QPlainTextEdit {{
@@ -103,6 +206,13 @@ QComboBox QAbstractItemView {{
     border: 1px solid {BORDER};
     selection-background-color: {ACCENT_DIM};
 }}
+QMenu {{
+    background: {BG_ELEV};
+    border: 1px solid {BORDER};
+    padding: 4px;
+}}
+QMenu::item {{ padding: 6px 18px; border-radius: 6px; }}
+QMenu::item:selected {{ background: {ACCENT_DIM}; color: {ON_ACCENT}; }}
 
 QListWidget {{
     background: {BG};
@@ -116,7 +226,7 @@ QListWidget::item {{
 }}
 QListWidget::item:selected {{
     background: {ACCENT_DIM};
-    color: #06281d;
+    color: {ON_ACCENT};
 }}
 QListWidget::item:hover:!selected {{ background: {BG_ELEV}; }}
 
@@ -135,7 +245,7 @@ QHeaderView::section {{
     padding: 6px;
     font-weight: 700;
 }}
-QTableWidget::item:selected {{ background: {ACCENT_DIM}; color: #06281d; }}
+QTableWidget::item:selected {{ background: {ACCENT_DIM}; color: {ON_ACCENT}; }}
 
 QCheckBox::indicator {{
     width: 18px; height: 18px;
@@ -163,7 +273,7 @@ QLabel#statusPillOn {{
     font-weight: 800;
     font-size: 11px;
     background: {ACCENT_DIM};
-    color: #06281d;
+    color: {ON_ACCENT};
     border: 1px solid {ACCENT};
 }}
 QSplitter::handle {{ background: {BORDER}; }}
@@ -172,3 +282,7 @@ QScrollBar::handle:vertical {{ background: {BORDER}; border-radius: 5px; min-hei
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 QToolTip {{ background: {BG_ELEV}; color: {TEXT}; border: 1px solid {BORDER}; }}
 """
+
+
+# Backwards-compatible default stylesheet.
+STYLESHEET = build_stylesheet()

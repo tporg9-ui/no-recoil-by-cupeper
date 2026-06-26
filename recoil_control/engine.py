@@ -8,6 +8,7 @@ per-step values aren't lost to integer rounding.
 
 from __future__ import annotations
 
+import random
 import threading
 import time
 from typing import Callable, Optional
@@ -110,11 +111,15 @@ class RecoilEngine:
             if profile is None:
                 return None
             steps = [(s.dx, s.dy, s.delay_ms) for s in profile.steps]
+            game_sens = max(0.01, profile.game_sensitivity)
             return (
                 steps,
-                profile.sensitivity * sens,
+                profile.sensitivity * sens / game_sens,
                 profile.loop,
                 profile.repeat_last,
+                profile.randomize,
+                max(0.0, profile.rand_pos),
+                max(0, profile.rand_delay),
             )
 
     def _emit(self, active: bool, step_index: int) -> None:
@@ -139,7 +144,7 @@ class RecoilEngine:
         snap = self._snapshot()
         if snap is None:
             return
-        steps, sens, loop, repeat_last = snap
+        steps, sens, loop, repeat_last, randomize, rand_pos, rand_delay = snap
         n = len(steps)
         if n == 0:
             return
@@ -156,14 +161,17 @@ class RecoilEngine:
                 else:
                     break
             dx, dy, delay_ms = steps[i]
-            mx = dx * sens + acc_x
-            my = dy * sens + acc_y
+            jx = random.uniform(-rand_pos, rand_pos) if randomize and rand_pos else 0.0
+            jy = random.uniform(-rand_pos, rand_pos) if randomize and rand_pos else 0.0
+            mx = (dx + jx) * sens + acc_x
+            my = (dy + jy) * sens + acc_y
             imx = int(mx)
             imy = int(my)
             acc_x = mx - imx
             acc_y = my - imy
             self._mover.move(imx, imy)
             self._emit(True, i)
-            time.sleep(max(0.0, delay_ms / 1000.0))
+            jitter = random.randint(-rand_delay, rand_delay) if randomize and rand_delay else 0
+            time.sleep(max(0.0, (delay_ms + jitter) / 1000.0))
             if not repeat_last or i < n - 1:
                 i += 1

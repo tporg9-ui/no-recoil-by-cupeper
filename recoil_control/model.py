@@ -59,9 +59,14 @@ class Profile:
     category: str = ""
     steps: list[Step] = field(default_factory=list)
     sensitivity: float = 1.0
+    game_sensitivity: float = 1.0
     activation: str = ACTIVATION_LMB
     loop: bool = False
     repeat_last: bool = False
+    randomize: bool = False
+    rand_pos: float = 0.0
+    rand_delay: int = 0
+    switch_hotkey: str = ""
     note: str = ""
 
     def to_dict(self) -> dict:
@@ -71,9 +76,14 @@ class Profile:
             "category": self.category,
             "steps": [s.to_dict() for s in self.steps],
             "sensitivity": self.sensitivity,
+            "game_sensitivity": self.game_sensitivity,
             "activation": self.activation,
             "loop": self.loop,
             "repeat_last": self.repeat_last,
+            "randomize": self.randomize,
+            "rand_pos": self.rand_pos,
+            "rand_delay": self.rand_delay,
+            "switch_hotkey": self.switch_hotkey,
             "note": self.note,
         }
 
@@ -88,9 +98,14 @@ class Profile:
             category=str(data.get("category", "")),
             steps=[Step.from_dict(s) for s in data.get("steps", [])],
             sensitivity=float(data.get("sensitivity", 1.0)),
+            game_sensitivity=float(data.get("game_sensitivity", 1.0)),
             activation=activation,
             loop=bool(data.get("loop", False)),
             repeat_last=bool(data.get("repeat_last", False)),
+            randomize=bool(data.get("randomize", False)),
+            rand_pos=float(data.get("rand_pos", 0.0)),
+            rand_delay=int(data.get("rand_delay", 0)),
+            switch_hotkey=str(data.get("switch_hotkey", "")),
             note=str(data.get("note", "")),
         )
 
@@ -105,6 +120,9 @@ class AppConfig:
     toggle_hotkey: str = "f8"
     global_sensitivity: float = 1.0
     tick_ms: int = 8
+    language: str = "en"
+    theme: str = "dark"
+    accent: str = "#27d796"
 
     def active_profile(self) -> Profile | None:
         if 0 <= self.active_index < len(self.profiles):
@@ -119,6 +137,9 @@ class AppConfig:
             "toggle_hotkey": self.toggle_hotkey,
             "global_sensitivity": self.global_sensitivity,
             "tick_ms": self.tick_ms,
+            "language": self.language,
+            "theme": self.theme,
+            "accent": self.accent,
         }
 
     @classmethod
@@ -130,6 +151,9 @@ class AppConfig:
             toggle_hotkey=str(data.get("toggle_hotkey", "f8")),
             global_sensitivity=float(data.get("global_sensitivity", 1.0)),
             tick_ms=int(data.get("tick_ms", 8)),
+            language=str(data.get("language", "en")),
+            theme=str(data.get("theme", "dark")),
+            accent=str(data.get("accent", "#27d796")),
         )
 
 

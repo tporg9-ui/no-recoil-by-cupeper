@@ -91,11 +91,26 @@ class InputListener:
         self._on_right = on_right
         self._on_hotkey = on_hotkey
         self._hotkey = "f8"
+        self._extra_hotkeys: dict[str, Callable[[], None]] = {}
+        self._capture_callback: Callable[[str], None] | None = None
         self._mouse_listener = None
         self._keyboard_listener = None
 
     def set_hotkey(self, hotkey: str) -> None:
         self._hotkey = (hotkey or "").strip().lower()
+
+    def set_extra_hotkeys(self, mapping: dict[str, Callable[[], None]]) -> None:
+        """Map key strings (e.g. "1", "f2") to callbacks (e.g. switch profile)."""
+        self._extra_hotkeys = {
+            (k or "").strip().lower(): cb for k, cb in mapping.items() if (k or "").strip()
+        }
+
+    def capture_next_key(self, callback: Callable[[str], None]) -> None:
+        """Intercept the next key press and report it as a string (one-shot)."""
+        self._capture_callback = callback
+
+    def cancel_capture(self) -> None:
+        self._capture_callback = None
 
     def start(self) -> None:
         from pynput import mouse, keyboard
@@ -108,28 +123,35 @@ class InputListener:
                 self._on_right(pressed)
 
         def on_press(key):
-            if self._matches_hotkey(key):
+            name = self._key_to_str(key)
+            if self._capture_callback is not None:
+                cb = self._capture_callback
+                self._capture_callback = None
+                if name:
+                    cb(name)
+                return
+            if name and name == self._hotkey:
                 self._on_hotkey()
+            elif name and name in self._extra_hotkeys:
+                self._extra_hotkeys[name]()
 
         self._mouse_listener = mouse.Listener(on_click=on_click)
         self._keyboard_listener = keyboard.Listener(on_press=on_press)
         self._mouse_listener.start()
         self._keyboard_listener.start()
 
-    def _matches_hotkey(self, key) -> bool:
-        target = self._hotkey
-        if not target:
-            return False
+    @staticmethod
+    def _key_to_str(key) -> str:
         try:
             from pynput import keyboard
 
             if isinstance(key, keyboard.Key):
-                return key.name == target
+                return key.name
             if isinstance(key, keyboard.KeyCode) and key.char is not None:
-                return key.char.lower() == target
+                return key.char.lower()
         except Exception:
-            return False
-        return False
+            return ""
+        return ""
 
     def stop(self) -> None:
         for listener in (self._mouse_listener, self._keyboard_listener):
